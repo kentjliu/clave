@@ -5,10 +5,9 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CognitoProvider({
       clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID!,
-      clientSecret: '',  // PKCE flow, no secret
+      clientSecret: process.env.COGNITO_CLIENT_SECRET!,
       issuer: process.env.COGNITO_ISSUER!,
       idToken: true,
-      checks: ['pkce', 'state'],
     }),
   ],
   session: { strategy: 'jwt' },

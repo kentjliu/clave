@@ -280,7 +280,7 @@ export class ClaveStack extends cdk.Stack {
     // ── Cognito User Pool Client ───────────────────────────────────────────────
     const userPoolClient = userPool.addClient('WebClient', {
       userPoolClientName: 'clave-web',
-      generateSecret: false,
+      generateSecret: true,
       authFlows: { userSrp: true, userPassword: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
@@ -300,6 +300,13 @@ export class ClaveStack extends cdk.Stack {
       },
     });
 
+    // Store the generated Cognito client secret in Secrets Manager so ECS can
+    // inject it at runtime without it appearing in plaintext in task definitions.
+    const cognitoClientSecret = new secretsmanager.Secret(this, 'CognitoClientSecret', {
+      secretName: 'clave/cognito-client-secret',
+      secretStringValue: userPoolClient.userPoolClientSecret,
+    });
+
     // Wire tokens that depend on CloudFront + Cognito client.
     webContainer.addEnvironment(
       'NEXTAUTH_URL',
@@ -309,12 +316,17 @@ export class ClaveStack extends cdk.Stack {
       'NEXT_PUBLIC_COGNITO_CLIENT_ID',
       userPoolClient.userPoolClientId,
     );
+    webContainer.addSecret(
+      'COGNITO_CLIENT_SECRET',
+      ecs.Secret.fromSecretsManager(cognitoClientSecret),
+    );
 
     // ── IAM grants ────────────────────────────────────────────────────────────
     projectsTable.grantReadWriteData(webTaskDef.taskRole);
     snapshotsTable.grantReadWriteData(webTaskDef.taskRole);
     bucket.grantRead(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
+    cognitoClientSecret.grantRead(webTaskDef.taskRole);
 
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
