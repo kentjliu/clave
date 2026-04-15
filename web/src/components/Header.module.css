@@ -17,6 +17,27 @@
   letter-spacing: -0.3px;
 }
 
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  padding-left: 24px;
+}
+
+.navLink {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  transition: color 0.15s, background 0.15s;
+}
+
+.navLink:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
 .right {
   display: flex;
   align-items: center;

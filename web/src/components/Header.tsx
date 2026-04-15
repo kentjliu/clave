@@ -13,6 +13,9 @@ export function Header({ user, username }: Props) {
   return (
     <header className={styles.header}>
       <Link href="/" className={styles.logo}>Clave</Link>
+      <nav className={styles.nav}>
+        <Link href="/explore" className={styles.navLink}>Explore</Link>
+      </nav>
       <div className={styles.right}>
         {username && (
           <Link href={`/users/${username}`} className={styles.profileLink}>
