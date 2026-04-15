@@ -106,6 +106,21 @@
   border-color: var(--text);
 }
 
+.heroPlayground {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.heroPlaygroundLink {
+  color: var(--accent);
+  transition: opacity 0.15s;
+}
+
+.heroPlaygroundLink:hover {
+  opacity: 0.8;
+}
+
 /* ── Timeline preview ── */
 .preview {
   width: 100%;

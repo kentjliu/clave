@@ -76,6 +76,12 @@ export function LandingPage() {
             See how it works
           </a>
         </div>
+        <p className={styles.heroPlayground}>
+          Just here to make beats?{' '}
+          <Link href="/playground" className={styles.heroPlaygroundLink}>
+            Try the Playground →
+          </Link>
+        </p>
       </section>
 
       {/* ── Timeline preview ── */}

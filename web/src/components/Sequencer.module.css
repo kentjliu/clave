@@ -1,0 +1,318 @@
+/* ─── Wrap ─────────────────────────────────────────────────────────────────── */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  padding: 20px 24px 32px;
+  overflow: hidden;
+}
+
+/* ─── Transport ─────────────────────────────────────────────────────────────── */
+
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+
+.bpmGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bpmLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  width: 30px;
+}
+
+.bpmSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 160px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.bpmSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.bpmSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+
+.bpmValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.playBtn,
+.stopBtn {
+  padding: 8px 24px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.playBtn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+
+.playBtn:hover {
+  background: #5a52e0;
+}
+
+.stopBtn {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+}
+
+.stopBtn:hover {
+  background: rgba(255, 107, 107, 0.25);
+}
+
+/* ─── Toolbar ───────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+
+.toolbarLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.toolBtn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.toolBtn:hover {
+  color: var(--text);
+  border-color: var(--text);
+  background: var(--bg);
+}
+
+.toolDivider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ─── Grid ──────────────────────────────────────────────────────────────────── */
+
+.gridScroll {
+  overflow-x: auto;
+  overflow-y: visible;
+  flex: 1;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 560px;
+}
+
+/* ─── Step numbers ──────────────────────────────────────────────────────────── */
+
+.stepNumbers {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-bottom: 2px;
+}
+
+.stepNum {
+  width: 30px;
+  text-align: center;
+  font-size: 10px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  transition: color 0.05s;
+}
+
+.stepNumBeat {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ─── Section dividers ──────────────────────────────────────────────────────── */
+
+.sectionDivider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sectionHint {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+/* ─── Track rows ────────────────────────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.trackMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 76px;
+  flex-shrink: 0;
+}
+
+.trackLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  min-width: 36px;
+}
+
+.muteBtn {
+  padding: 2px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  opacity: 0.5;
+}
+
+.muteBtn:hover {
+  opacity: 1;
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.muteBtnOn {
+  opacity: 1;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: rgba(255, 107, 107, 0.5);
+  color: #ff6b6b;
+}
+
+/* ─── Cells ─────────────────────────────────────────────────────────────────── */
+
+.cell {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.05s, border-color 0.05s, box-shadow 0.05s;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell:hover {
+  border-color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cellBeat {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.cellSynth {
+  height: 34px;
+}
+
+/* ─── Note label inside synth cell ─────────────────────────────────────────── */
+
+.noteLabel {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ─── Hint ──────────────────────────────────────────────────────────────────── */
+
+.hint {
+  margin-top: 20px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  opacity: 0.7;
+}
