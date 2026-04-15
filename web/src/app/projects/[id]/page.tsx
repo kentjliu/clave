@@ -32,7 +32,7 @@ export default async function ProjectPage({
         <div className={styles.header}>
           <Link href="/" className={styles.back}>← Projects</Link>
           <h1 className={styles.title}>{project.name}</h1>
-          <p className={styles.path}>{project.path}</p>
+          <p className={styles.path}>{project.flp_path}</p>
         </div>
 
         <SnapshotList

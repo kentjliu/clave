@@ -324,7 +324,7 @@ export class ClaveStack extends cdk.Stack {
     // ── IAM grants ────────────────────────────────────────────────────────────
     projectsTable.grantReadWriteData(webTaskDef.taskRole);
     snapshotsTable.grantReadWriteData(webTaskDef.taskRole);
-    bucket.grantRead(webTaskDef.taskRole);
+    bucket.grantReadWrite(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
     cognitoClientSecret.grantRead(webTaskDef.taskRole);
 
