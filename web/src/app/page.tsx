@@ -23,7 +23,7 @@ export default async function HomePage() {
 
   return (
     <div className={styles.layout}>
-      <Header user={session.user} />
+      <Header user={session.user} username={profile?.username} />
       <main className={styles.main}>
         {!profile && <ProfileBanner />}
         <ProjectsPage projects={projects} />

@@ -5,20 +5,30 @@ import { signOut } from 'next-auth/react';
 import styles from './Header.module.css';
 
 interface Props {
-  user: { name?: string | null; email?: string | null };
+  user: { name?: string | null; email?: string | null } | null;
+  username?: string;
 }
 
-export function Header({ user }: Props) {
+export function Header({ user, username }: Props) {
   return (
     <header className={styles.header}>
       <Link href="/" className={styles.logo}>Clave</Link>
       <div className={styles.right}>
-        <Link href="/account" className={styles.email}>
-          {user.email ?? user.name}
-        </Link>
-        <button className={styles.signOut} onClick={() => signOut()}>
-          Sign out
-        </button>
+        {username && (
+          <Link href={`/users/${username}`} className={styles.profileLink}>
+            @{username}
+          </Link>
+        )}
+        {user && (
+          <>
+            <Link href="/account" className={styles.email}>
+              {user.email ?? user.name}
+            </Link>
+            <button className={styles.signOut} onClick={() => signOut()}>
+              Sign out
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

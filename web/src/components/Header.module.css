@@ -23,6 +23,12 @@
   gap: 16px;
 }
 
+.profileLink {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+}
+
 .email {
   font-size: 13px;
   color: var(--muted);
