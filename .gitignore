@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# CDK / Node
+infra/node_modules/
+infra/cdk.out/
+infra/dist/
+
+# Claude Code
+.claude/
+
+# macOS
+.DS_Store

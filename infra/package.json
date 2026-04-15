@@ -1,0 +1,25 @@
+{
+  "name": "clave-infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.0",
+    "@types/node": "^20.0.0",
+    "aws-cdk": "^2.130.0",
+    "esbuild": "^0.20.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.89.0",
+    "aws-cdk-lib": "^2.130.0",
+    "constructs": "^10.0.0"
+  }
+}
