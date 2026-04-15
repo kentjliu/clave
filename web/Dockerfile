@@ -1,13 +1,33 @@
-FROM node:20-alpine
+FROM node:20-alpine AS base
+
+# ── deps ─────────────────────────────────────────────────────────────────────
+FROM base AS deps
 WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# Minimal placeholder server — replaced when the Next.js app is built.
-RUN printf 'const http = require("http");\n\
-http.createServer((req, res) => {\n\
-  const ok = req.url === "/api/health";\n\
-  res.writeHead(ok ? 200 : 404);\n\
-  res.end(ok ? "ok" : "Clave \u2014 coming soon");\n\
-}).listen(3000, () => console.log("placeholder running on :3000"));\n' > server.js
+# ── builder ───────────────────────────────────────────────────────────────────
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
 
+# ── runner ────────────────────────────────────────────────────────────────────
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
 CMD ["node", "server.js"]
