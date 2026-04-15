@@ -37,9 +37,87 @@
   margin-bottom: 3px;
 }
 
+.summaryWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
 .summary {
   font-size: 14px;
+  flex: 1;
 }
+
+.editBtn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.row:hover .editBtn { opacity: 1; }
+.editBtn:hover { color: var(--text); }
+
+.editArea {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summaryTextarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1.5;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
+
+.saveBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 14px;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.saveBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.saveBtn:hover:not(:disabled) { background: var(--accent-hover); }
+
+.cancelBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 5px 14px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.cancelBtn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+.cancelBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .pending {
   color: var(--muted);

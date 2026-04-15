@@ -28,9 +28,25 @@ function formatDate(iso: string): string {
   });
 }
 
-function SnapshotRow({ snap, projectId }: { snap: SnapshotRecord; projectId: string }) {
+function SnapshotRow({
+  snap,
+  projectId,
+  onSummaryUpdate,
+}: {
+  snap: SnapshotRecord;
+  projectId: string;
+  onSummaryUpdate: (timestamp: string, summary: string) => void;
+}) {
   const [downloading, setDownloading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded]       = useState(false);
+  const [editing, setEditing]         = useState(false);
+  const [draft, setDraft]             = useState(snap.summary ?? '');
+  const [saving, setSaving]           = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing) textareaRef.current?.focus();
+  }, [editing]);
 
   async function handleDownload() {
     setDownloading(true);
@@ -48,21 +64,80 @@ function SnapshotRow({ snap, projectId }: { snap: SnapshotRecord; projectId: str
     }
   }
 
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const encodedTs = encodeURIComponent(snap.timestamp);
+      const res = await fetch(`/api/projects/${projectId}/snapshots/${encodedTs}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary: draft }),
+      });
+      if (res.ok) {
+        onSummaryUpdate(snap.timestamp, draft);
+        setEditing(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    setDraft(snap.summary ?? '');
+    setEditing(false);
+  }
+
   const meta = snap.metadata ? (() => {
     try { return JSON.parse(snap.metadata); } catch { return null; }
   })() : null;
+
+  const canEdit = snap.summary_status === 'done' || snap.summary_status === 'failed';
 
   return (
     <li className={styles.row}>
       <div className={styles.rowMain}>
         <div className={styles.rowLeft}>
           <div className={styles.timestamp}>{formatDate(snap.timestamp)}</div>
-          <div className={styles.summary}>
-            {snap.summary_status === 'done' && snap.summary
-              ? snap.summary
-              : snap.summary_status === 'failed'
-              ? <span className={styles.failed}>Summary unavailable</span>
-              : <span className={styles.pending}>Summarizing...</span>}
+          <div className={styles.summaryWrap}>
+            {editing ? (
+              <div className={styles.editArea}>
+                <textarea
+                  ref={textareaRef}
+                  className={styles.summaryTextarea}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  rows={3}
+                  disabled={saving}
+                />
+                <div className={styles.editActions}>
+                  <button className={styles.saveBtn} onClick={handleSave} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button className={styles.cancelBtn} onClick={handleCancel} disabled={saving}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.summaryRow}>
+                <span className={styles.summary}>
+                  {snap.summary_status === 'done' && snap.summary
+                    ? snap.summary
+                    : snap.summary_status === 'failed'
+                    ? <span className={styles.failed}>Summary unavailable</span>
+                    : <span className={styles.pending}>Summarizing...</span>}
+                </span>
+                {canEdit && (
+                  <button
+                    className={styles.editBtn}
+                    onClick={() => { setDraft(snap.summary ?? ''); setEditing(true); }}
+                    title="Edit summary"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <div className={styles.rowRight}>
@@ -122,6 +197,14 @@ export function SnapshotList({ snapshots: initial, projectId }: Props) {
   const [snapshots, setSnapshots] = useState(initial);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  function handleSummaryUpdate(timestamp: string, summary: string) {
+    setSnapshots((prev) =>
+      prev.map((s) =>
+        s.timestamp === timestamp ? { ...s, summary, summary_status: 'done' } : s,
+      ),
+    );
+  }
+
   useEffect(() => {
     setSnapshots(initial);
   }, [initial]);
@@ -161,7 +244,12 @@ export function SnapshotList({ snapshots: initial, projectId }: Props) {
   return (
     <ul className={styles.list}>
       {snapshots.map((snap) => (
-        <SnapshotRow key={snap.timestamp} snap={snap} projectId={projectId} />
+        <SnapshotRow
+          key={snap.timestamp}
+          snap={snap}
+          projectId={projectId}
+          onSummaryUpdate={handleSummaryUpdate}
+        />
       ))}
     </ul>
   );

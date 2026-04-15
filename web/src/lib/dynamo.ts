@@ -227,6 +227,19 @@ export async function getProjects(userId: string): Promise<ProjectRecord[]> {
   return (res.Items ?? []) as ProjectRecord[];
 }
 
+export async function updateSnapshotSummary(
+  projectId: string,
+  timestamp: string,
+  summary: string,
+): Promise<void> {
+  await dynamo.send(new UpdateCommand({
+    TableName: SNAPSHOTS_TABLE,
+    Key: { project_id: projectId, timestamp },
+    UpdateExpression: 'SET summary = :s, summary_status = :st',
+    ExpressionAttributeValues: { ':s': summary, ':st': 'done' },
+  }));
+}
+
 export async function getSnapshots(projectId: string): Promise<SnapshotRecord[]> {
   const items: SnapshotRecord[] = [];
   let lastKey: Record<string, unknown> | undefined;
