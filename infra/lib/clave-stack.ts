@@ -1,20 +1,22 @@
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import * as path from 'path';
+
+// Claude 3.5 Haiku on Bedrock — fast and cheap, same model family.
+// Requires model access to be enabled in the Bedrock console for this region.
+const BEDROCK_MODEL_ID = 'anthropic.claude-3-5-haiku-20241022-v1:0';
 
 export class ClaveStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     // ── S3: snapshot storage ──────────────────────────────────────────────────
-    // Content-addressed: {user_id}/{project_id}/{sha256}.flp
-    // RETAIN on destroy — never delete user snapshots on stack teardown.
     const bucket = new s3.Bucket(this, 'SnapshotsBucket', {
       bucketName: `clave-snapshots-${this.account}-${this.region}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -23,8 +25,7 @@ export class ClaveStack extends cdk.Stack {
     });
 
     // ── DynamoDB: projects ────────────────────────────────────────────────────
-    // PK: user_id  SK: project_id
-    // Scoped by user from day one for future multi-tenancy.
+    // PK: user_id  SK: project_id — scoped by user for future multi-tenancy.
     const projectsTable = new dynamodb.Table(this, 'ProjectsTable', {
       tableName: 'clave-projects',
       partitionKey: { name: 'user_id', type: dynamodb.AttributeType.STRING },
@@ -34,8 +35,7 @@ export class ClaveStack extends cdk.Stack {
     });
 
     // ── DynamoDB: snapshots ───────────────────────────────────────────────────
-    // PK: project_id  SK: timestamp (ISO, sortable)
-    // GSI on hash: allows Lambda to look up a record from the S3 key alone.
+    // PK: project_id  SK: timestamp  GSI: hash → lets Lambda look up by S3 key.
     const snapshotsTable = new dynamodb.Table(this, 'SnapshotsTable', {
       tableName: 'clave-snapshots',
       partitionKey: { name: 'project_id', type: dynamodb.AttributeType.STRING },
@@ -50,23 +50,9 @@ export class ClaveStack extends cdk.Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // ── Secrets Manager: Anthropic API key ────────────────────────────────────
-    // The secret value is a placeholder — set it manually after deploy:
-    //   aws secretsmanager put-secret-value \
-    //     --secret-id clave/anthropic-api-key \
-    //     --secret-string "sk-ant-..."
-    const anthropicSecret = new secretsmanager.Secret(this, 'AnthropicApiKey', {
-      secretName: 'clave/anthropic-api-key',
-      description: 'Anthropic API key used by the clave summarizer Lambda',
-      generateSecretString: {
-        secretStringTemplate: JSON.stringify({ placeholder: true }),
-        generateStringKey: '_unused',
-      },
-    });
-
     // ── Lambda: summarizer ────────────────────────────────────────────────────
-    // NodejsFunction bundles the TypeScript handler + @anthropic-ai/sdk with
-    // esbuild at synth time. AWS SDK modules are excluded (available in runtime).
+    // All AWS SDK clients (including Bedrock) are available in the runtime —
+    // no bundling needed, no API key, IAM handles auth.
     const summarizerFn = new lambdaNodejs.NodejsFunction(this, 'Summarizer', {
       functionName: 'clave-summarizer',
       entry: path.join(__dirname, '../lambda/summarizer/index.ts'),
@@ -76,20 +62,25 @@ export class ClaveStack extends cdk.Stack {
       memorySize: 256,
       environment: {
         SNAPSHOTS_TABLE: snapshotsTable.tableName,
-        ANTHROPIC_SECRET_ARN: anthropicSecret.secretArn,
+        BEDROCK_MODEL_ID,
       },
       bundling: {
-        // Bundle @anthropic-ai/sdk; exclude AWS SDK (provided by runtime).
         externalModules: ['@aws-sdk/*'],
         minify: true,
         sourceMap: false,
-        nodeModules: ['@anthropic-ai/sdk'],
       },
     });
 
     snapshotsTable.grantReadWriteData(summarizerFn);
     bucket.grantRead(summarizerFn);
-    anthropicSecret.grantRead(summarizerFn);
+
+    // Allow Lambda to call the specific Bedrock model.
+    summarizerFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['bedrock:InvokeModel'],
+      resources: [
+        `arn:aws:bedrock:${this.region}::foundation-model/${BEDROCK_MODEL_ID}`,
+      ],
+    }));
 
     // S3 PutObject on any .flp file triggers the summarizer.
     bucket.addEventNotification(
@@ -98,7 +89,7 @@ export class ClaveStack extends cdk.Stack {
       { suffix: '.flp' },
     );
 
-    // ── Stack outputs (use these to populate ~/.clave/config.json) ────────────
+    // ── Stack outputs ─────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'BucketName', {
       value: bucket.bucketName,
       description: 'S3 bucket for .flp snapshots',
@@ -111,13 +102,9 @@ export class ClaveStack extends cdk.Stack {
       value: snapshotsTable.tableName,
       description: 'DynamoDB table for snapshots',
     });
-    new cdk.CfnOutput(this, 'Region', {
-      value: this.region,
-      description: 'AWS region',
-    });
-    new cdk.CfnOutput(this, 'AnthropicSecretName', {
-      value: anthropicSecret.secretName,
-      description: 'Set your Anthropic API key here after deploy',
+    new cdk.CfnOutput(this, 'BedrockModelId', {
+      value: BEDROCK_MODEL_ID,
+      description: 'Bedrock model used for summarization',
     });
   }
 }

@@ -6,28 +6,15 @@ import {
   UpdateCommand,
 } from '@aws-sdk/lib-dynamodb';
 import {
-  SecretsManagerClient,
-  GetSecretValueCommand,
-} from '@aws-sdk/client-secrets-manager';
-import Anthropic from '@anthropic-ai/sdk';
+  BedrockRuntimeClient,
+  InvokeModelCommand,
+} from '@aws-sdk/client-bedrock-runtime';
 
 const dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({}));
-const secretsClient = new SecretsManagerClient({});
+const bedrock = new BedrockRuntimeClient({});
 
 const SNAPSHOTS_TABLE = process.env.SNAPSHOTS_TABLE!;
-const ANTHROPIC_SECRET_ARN = process.env.ANTHROPIC_SECRET_ARN!;
-
-// Cache the Anthropic client across warm Lambda invocations.
-let anthropic: Anthropic | null = null;
-
-async function getAnthropicClient(): Promise<Anthropic> {
-  if (anthropic) return anthropic;
-  const res = await secretsClient.send(
-    new GetSecretValueCommand({ SecretId: ANTHROPIC_SECRET_ARN }),
-  );
-  anthropic = new Anthropic({ apiKey: res.SecretString! });
-  return anthropic;
-}
+const BEDROCK_MODEL_ID = process.env.BEDROCK_MODEL_ID!;
 
 // ── Prompt ───────────────────────────────────────────────────────────────────
 
@@ -58,7 +45,25 @@ If this is the first snapshot, describe the initial project state.
 Do not speculate beyond what the data shows.`;
 }
 
-// ── Core logic ───────────────────────────────────────────────────────────────
+// ── Bedrock invocation ────────────────────────────────────────────────────────
+
+async function invoke(prompt: string): Promise<string> {
+  const response = await bedrock.send(new InvokeModelCommand({
+    modelId: BEDROCK_MODEL_ID,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: JSON.stringify({
+      anthropic_version: 'bedrock-2023-05-31',
+      max_tokens: 80,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  }));
+
+  const body = JSON.parse(new TextDecoder().decode(response.body));
+  return body.content[0].text.trim();
+}
+
+// ── Core logic ────────────────────────────────────────────────────────────────
 
 async function processRecord(s3Key: string): Promise<void> {
   // Key format: {user_id}/{project_id}/{hash}.flp
@@ -69,18 +74,16 @@ async function processRecord(s3Key: string): Promise<void> {
   }
 
   const projectId = parts[1];
-  const hash = parts[2].slice(0, -4); // strip .flp
+  const hash = parts[2].slice(0, -4);
 
   // Look up snapshot record via hash GSI.
-  const gsiRes = await dynamo.send(
-    new QueryCommand({
-      TableName: SNAPSHOTS_TABLE,
-      IndexName: 'hash-index',
-      KeyConditionExpression: '#h = :h',
-      ExpressionAttributeNames: { '#h': 'hash' },
-      ExpressionAttributeValues: { ':h': hash },
-    }),
-  );
+  const gsiRes = await dynamo.send(new QueryCommand({
+    TableName: SNAPSHOTS_TABLE,
+    IndexName: 'hash-index',
+    KeyConditionExpression: '#h = :h',
+    ExpressionAttributeNames: { '#h': 'hash' },
+    ExpressionAttributeValues: { ':h': hash },
+  }));
 
   const snapshot = gsiRes.Items?.[0];
   if (!snapshot) {
@@ -92,38 +95,25 @@ async function processRecord(s3Key: string): Promise<void> {
   const currentMeta: Record<string, unknown> = JSON.parse(snapshot.metadata ?? '{}');
   const fileSize: number = snapshot.file_size ?? 0;
 
-  // Get the snapshot immediately before this one (by timestamp).
-  const prevRes = await dynamo.send(
-    new QueryCommand({
-      TableName: SNAPSHOTS_TABLE,
-      KeyConditionExpression: 'project_id = :pid AND #ts < :ts',
-      ExpressionAttributeNames: { '#ts': 'timestamp' },
-      ExpressionAttributeValues: { ':pid': projectId, ':ts': timestamp },
-      ScanIndexForward: false,
-      Limit: 1,
-    }),
-  );
+  // Get the snapshot immediately before this one.
+  const prevRes = await dynamo.send(new QueryCommand({
+    TableName: SNAPSHOTS_TABLE,
+    KeyConditionExpression: 'project_id = :pid AND #ts < :ts',
+    ExpressionAttributeNames: { '#ts': 'timestamp' },
+    ExpressionAttributeValues: { ':pid': projectId, ':ts': timestamp },
+    ScanIndexForward: false,
+    Limit: 1,
+  }));
 
   const prevSnapshot = prevRes.Items?.[0] ?? null;
-  const prevMeta: Record<string, unknown> | null = prevSnapshot
-    ? JSON.parse(prevSnapshot.metadata ?? '{}')
-    : null;
-  const prevSize: number = prevSnapshot?.file_size ?? fileSize;
-  const sizeDelta = fileSize - prevSize;
-
-  // Generate summary.
-  const client = await getAnthropicClient();
+  const prevMeta = prevSnapshot ? JSON.parse(prevSnapshot.metadata ?? '{}') : null;
+  const sizeDelta = fileSize - (prevSnapshot?.file_size ?? fileSize);
 
   let summary: string;
   let status: string;
 
   try {
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 80,
-      messages: [{ role: 'user', content: buildPrompt(currentMeta, prevMeta, sizeDelta) }],
-    });
-    summary = (message.content[0] as Anthropic.TextBlock).text.trim();
+    summary = await invoke(buildPrompt(currentMeta, prevMeta, sizeDelta));
     status = 'done';
     console.log(`[${hash.slice(0, 12)}] ${summary}`);
   } catch (err) {
@@ -132,18 +122,15 @@ async function processRecord(s3Key: string): Promise<void> {
     status = 'failed';
   }
 
-  // Write summary back to the snapshot record.
-  await dynamo.send(
-    new UpdateCommand({
-      TableName: SNAPSHOTS_TABLE,
-      Key: { project_id: projectId, timestamp },
-      UpdateExpression: 'SET summary = :s, summary_status = :st',
-      ExpressionAttributeValues: { ':s': summary, ':st': status },
-    }),
-  );
+  await dynamo.send(new UpdateCommand({
+    TableName: SNAPSHOTS_TABLE,
+    Key: { project_id: projectId, timestamp },
+    UpdateExpression: 'SET summary = :s, summary_status = :st',
+    ExpressionAttributeValues: { ':s': summary, ':st': status },
+  }));
 }
 
-// ── Handler ──────────────────────────────────────────────────────────────────
+// ── Handler ───────────────────────────────────────────────────────────────────
 
 export const handler = async (event: S3Event): Promise<void> => {
   await Promise.all(
