@@ -135,6 +135,7 @@ export interface ProjectRecord {
   name: string;
   flp_path: string;
   watch_path?: string;   // absolute local path the agent should watch; absent = not watched
+  visibility?: 'public' | 'private';  // default: public
 }
 
 export interface SnapshotRecord {
@@ -189,6 +190,19 @@ export async function createSnapshot(snapshot: {
     },
     ConditionExpression: 'attribute_not_exists(#ts)',
     ExpressionAttributeNames: { '#ts': 'timestamp' },
+  }));
+}
+
+export async function setProjectVisibility(
+  userId: string,
+  projectId: string,
+  visibility: 'public' | 'private',
+): Promise<void> {
+  await dynamo.send(new UpdateCommand({
+    TableName: PROJECTS_TABLE,
+    Key: { user_id: userId, project_id: projectId },
+    UpdateExpression: 'SET visibility = :v',
+    ExpressionAttributeValues: { ':v': visibility },
   }));
 }
 

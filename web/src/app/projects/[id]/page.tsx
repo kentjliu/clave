@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { SnapshotList } from '@/components/SnapshotList';
 import { WatchSettings } from '@/components/WatchSettings';
+import { VisibilityToggle } from '@/components/VisibilityToggle';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,13 @@ export default async function ProjectPage({
       <main className={styles.main}>
         <div className={styles.header}>
           <Link href="/" className={styles.back}>← Projects</Link>
-          <h1 className={styles.title}>{project.name}</h1>
+          <div className={styles.titleRow}>
+            <h1 className={styles.title}>{project.name}</h1>
+            <VisibilityToggle
+              projectId={projectId}
+              initial={project.visibility ?? 'public'}
+            />
+          </div>
           <p className={styles.path}>{project.flp_path}</p>
         </div>
 

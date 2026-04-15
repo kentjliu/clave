@@ -28,10 +28,16 @@
   color: var(--text);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
 .title {
   font-size: 22px;
   font-weight: 600;
-  margin-bottom: 4px;
 }
 
 .path {

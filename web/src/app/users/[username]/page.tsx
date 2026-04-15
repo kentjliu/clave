@@ -40,7 +40,12 @@ export default async function UserProfilePage({
 
   if (!profile) notFound();
 
-  const projects = await getProjects(profile.user_id);
+  const isOwnProfile = session?.user?.id === profile.user_id;
+
+  const allProjects = await getProjects(profile.user_id);
+  const projects = isOwnProfile
+    ? allProjects
+    : allProjects.filter((p) => (p.visibility ?? 'public') === 'public');
 
   // Fetch latest snapshot for each project (just the first since results are
   // sorted descending). Run in parallel, cap at 10 concurrent.
@@ -54,8 +59,6 @@ export default async function UserProfilePage({
       };
     }),
   );
-
-  const isOwnProfile = session?.user?.id === profile.user_id;
 
   return (
     <div className={styles.layout}>
