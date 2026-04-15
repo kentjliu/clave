@@ -19,7 +19,9 @@ function formatBytes(bytes: number): string {
 }
 
 function formatDate(iso: string): string {
-  const d = new Date(iso);
+  // Timestamps are stored as e.g. "2026-04-14T14-32-10" — normalize to ISO 8601.
+  const normalized = iso.replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3');
+  const d = new Date(normalized);
   return d.toLocaleString(undefined, {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
