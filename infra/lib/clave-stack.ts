@@ -14,6 +14,8 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -89,6 +91,37 @@ export class ClaveStack extends cdk.Stack {
       new s3n.LambdaDestination(summarizerFn),
       { suffix: '.flp' },
     );
+
+    // ── Lambda: retention ─────────────────────────────────────────────────────
+    const retentionFn = new lambdaNodejs.NodejsFunction(this, 'Retention', {
+      functionName: 'clave-retention',
+      entry: path.join(__dirname, '../lambda/retention/index.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      timeout: cdk.Duration.minutes(5),
+      memorySize: 256,
+      environment: {
+        PROJECTS_TABLE:  projectsTable.tableName,
+        SNAPSHOTS_TABLE: snapshotsTable.tableName,
+        BUCKET:          bucket.bucketName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
+        minify: true,
+        sourceMap: false,
+      },
+      logRetention: logs.RetentionDays.ONE_MONTH,
+    });
+
+    projectsTable.grantReadData(retentionFn);
+    snapshotsTable.grantReadWriteData(retentionFn);
+    bucket.grantDelete(retentionFn);
+
+    // Run every night at 03:00 UTC.
+    new events.Rule(this, 'RetentionSchedule', {
+      schedule: events.Schedule.cron({ hour: '3', minute: '0' }),
+      targets: [new targets.LambdaFunction(retentionFn)],
+    });
 
     // =========================================================================
     // Web infrastructure
