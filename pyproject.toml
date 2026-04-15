@@ -12,6 +12,7 @@ dependencies = [
     "pyflp==2.2.1",
     "boto3>=1.34",
     "click>=8.1",
+    "requests>=2.31",
 ]
 
 [project.scripts]

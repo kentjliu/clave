@@ -7,6 +7,7 @@ from typing import Optional
 
 import click
 
+from . import agent as agent_mod
 from . import auth, config, parser, registry, retention, snapshot, storage
 
 logging.basicConfig(
@@ -144,6 +145,15 @@ def logout():
         return
     auth.logout()
     click.echo("Logged out.")
+
+
+@main.command()
+def start():
+    """Start the background agent (polls web UI for files to watch)."""
+    if not auth.is_logged_in():
+        click.echo("Error: not logged in. Run `clave login` first.", err=True)
+        sys.exit(1)
+    agent_mod.run()
 
 
 @main.command()

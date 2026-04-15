@@ -5,6 +5,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
 import { SnapshotList } from '@/components/SnapshotList';
+import { WatchSettings } from '@/components/WatchSettings';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +40,12 @@ export default async function ProjectPage({
           snapshots={snapshots}
           projectId={projectId}
           userId={session.user.id}
+        />
+
+        <WatchSettings
+          projectId={projectId}
+          watchPath={project.watch_path}
+          flpPath={project.flp_path}
         />
       </main>
     </div>
