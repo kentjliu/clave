@@ -98,6 +98,13 @@
   color: var(--muted);
 }
 
+.profileActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .messageBtn {
   flex-shrink: 0;
   background: var(--accent);

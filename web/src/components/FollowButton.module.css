@@ -1,0 +1,33 @@
+.btnFollow {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 20px;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btnFollow:hover:not(:disabled) { background: var(--accent-hover); }
+.btnFollow:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btnFollowing {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 20px;
+  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.btnFollowing:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.btnFollowing:disabled { opacity: 0.4; cursor: not-allowed; }

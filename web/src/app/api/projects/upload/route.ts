@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { createProject, createSnapshot } from '@/lib/dynamo';
+import { createProject, createSnapshot, getProfile, writeActivity } from '@/lib/dynamo';
 import { getUploadUrl } from '@/lib/s3';
 import { randomUUID } from 'crypto';
 
@@ -48,6 +48,25 @@ export async function POST(req: Request) {
     file_size,
     s3_key: s3Key,
   });
+
+  // Write activity events (best-effort — don't fail the upload if this errors).
+  getProfile(userId).then((profile) => {
+    if (!profile) return;
+    const base = {
+      user_id:      userId,
+      project_id:   projectId,
+      project_name: name,
+      project_visibility: 'public' as const,
+      username:     profile.username,
+      display_name: profile.display_name,
+      avatar_url:   profile.avatar_url,
+    };
+    const now = new Date().toISOString();
+    Promise.all([
+      writeActivity({ ...base, type: 'project_created',  created_at: now }),
+      writeActivity({ ...base, type: 'snapshot_created', created_at: new Date(Date.now() + 1).toISOString() }),
+    ]).catch(() => {});
+  }).catch(() => {});
 
   const upload_url = await getUploadUrl(s3Key);
 

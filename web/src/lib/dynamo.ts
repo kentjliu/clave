@@ -7,6 +7,8 @@ export const dynamo = DynamoDBDocumentClient.from(client);
 export const PROJECTS_TABLE       = process.env.DYNAMODB_PROJECTS_TABLE!;
 export const SNAPSHOTS_TABLE      = process.env.DYNAMODB_SNAPSHOTS_TABLE!;
 export const USERS_TABLE          = process.env.DYNAMODB_USERS_TABLE!;
+export const FOLLOWS_TABLE        = process.env.DYNAMODB_FOLLOWS_TABLE!;
+export const ACTIVITY_TABLE       = process.env.DYNAMODB_ACTIVITY_TABLE!;
 export const COLLABORATORS_TABLE  = process.env.DYNAMODB_COLLABORATORS_TABLE!;
 export const CONVERSATIONS_TABLE  = process.env.DYNAMODB_CONVERSATIONS_TABLE!;
 export const MESSAGES_TABLE       = process.env.DYNAMODB_MESSAGES_TABLE!;
@@ -477,4 +479,104 @@ export async function removeCollaborator(projectId: string, collaboratorId: stri
     TableName: COLLABORATORS_TABLE,
     Key: { project_id: projectId, collaborator_id: collaboratorId },
   }));
+}
+
+// ── Follows ───────────────────────────────────────────────────────────────────
+
+export interface FollowRecord {
+  follower_id:  string;
+  following_id: string;
+  created_at:   string;
+}
+
+export async function followUser(followerId: string, followingId: string): Promise<void> {
+  await dynamo.send(new PutCommand({
+    TableName: FOLLOWS_TABLE,
+    Item: { follower_id: followerId, following_id: followingId, created_at: new Date().toISOString() },
+  }));
+}
+
+export async function unfollowUser(followerId: string, followingId: string): Promise<void> {
+  await dynamo.send(new DeleteCommand({
+    TableName: FOLLOWS_TABLE,
+    Key: { follower_id: followerId, following_id: followingId },
+  }));
+}
+
+export async function isFollowing(followerId: string, followingId: string): Promise<boolean> {
+  const res = await dynamo.send(new GetCommand({
+    TableName: FOLLOWS_TABLE,
+    Key: { follower_id: followerId, following_id: followingId },
+  }));
+  return !!res.Item;
+}
+
+// IDs of users that `userId` follows.
+export async function getFollowing(userId: string): Promise<string[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: FOLLOWS_TABLE,
+    KeyConditionExpression: 'follower_id = :uid',
+    ExpressionAttributeValues: { ':uid': userId },
+  }));
+  return ((res.Items ?? []) as FollowRecord[]).map((r) => r.following_id);
+}
+
+// Number of users following `userId` (follower count).
+export async function getFollowerCount(userId: string): Promise<number> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: FOLLOWS_TABLE,
+    IndexName: 'following-index',
+    KeyConditionExpression: 'following_id = :uid',
+    ExpressionAttributeValues: { ':uid': userId },
+    Select: 'COUNT',
+  }));
+  return res.Count ?? 0;
+}
+
+// ── Activity ──────────────────────────────────────────────────────────────────
+
+export type ActivityType = 'snapshot_created' | 'project_created';
+
+export interface ActivityEvent {
+  user_id:            string;
+  created_at:         string;
+  type:               ActivityType;
+  project_id:         string;
+  project_name:       string;
+  project_visibility: 'public' | 'private';
+  username:           string;
+  display_name:       string;
+  avatar_url?:        string;
+}
+
+export async function writeActivity(event: ActivityEvent): Promise<void> {
+  await dynamo.send(new PutCommand({
+    TableName: ACTIVITY_TABLE,
+    Item: event,
+  }));
+}
+
+async function getUserActivity(userId: string, limit: number): Promise<ActivityEvent[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: ACTIVITY_TABLE,
+    KeyConditionExpression: 'user_id = :uid',
+    ExpressionAttributeValues: { ':uid': userId },
+    ScanIndexForward: false,
+    Limit: limit,
+  }));
+  return (res.Items ?? []) as ActivityEvent[];
+}
+
+export async function getFeedActivity(userId: string, limit = 30): Promise<ActivityEvent[]> {
+  const followingIds = await getFollowing(userId);
+  const actorIds = [userId, ...followingIds];
+
+  const perUser = await Promise.all(actorIds.map((id) => getUserActivity(id, 20)));
+
+  return perUser
+    .flat()
+    // Show private events only in your own feed; filter them from others.
+    .filter((e) => e.user_id === userId || e.project_visibility === 'public')
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, limit);
 }

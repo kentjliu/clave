@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAgentToken } from '@/lib/agent-auth';
-import { getProjects, createSnapshot } from '@/lib/dynamo';
+import { getProjects, createSnapshot, getProfile, writeActivity } from '@/lib/dynamo';
 import { getUploadUrl } from '@/lib/s3';
 
 function makeTimestamp(): string {
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
   const timestamp = makeTimestamp();
   const s3Key = `${identity.userId}/${project_id}/${hash}.flp`;
 
+  const project = projects.find((p) => p.project_id === project_id)!;
+
   await createSnapshot({
     project_id,
     timestamp,
@@ -41,6 +43,22 @@ export async function POST(req: NextRequest) {
     file_size,
     s3_key: s3Key,
   });
+
+  // Write activity event (best-effort).
+  getProfile(identity.userId).then((profile) => {
+    if (!profile) return;
+    writeActivity({
+      user_id:            identity.userId,
+      created_at:         new Date().toISOString(),
+      type:               'snapshot_created',
+      project_id,
+      project_name:       project.name,
+      project_visibility: project.visibility ?? 'public',
+      username:           profile.username,
+      display_name:       profile.display_name,
+      avatar_url:         profile.avatar_url,
+    }).catch(() => {});
+  }).catch(() => {});
 
   const upload_url = await getUploadUrl(s3Key);
 

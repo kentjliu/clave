@@ -76,6 +76,28 @@ export class ClaveStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const followsTable = new dynamodb.Table(this, 'FollowsTable', {
+      tableName: 'clave-follows',
+      partitionKey: { name: 'follower_id',  type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'following_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    followsTable.addGlobalSecondaryIndex({
+      indexName: 'following-index',
+      partitionKey: { name: 'following_id', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
+    });
+
+    const activityTable = new dynamodb.Table(this, 'ActivityTable', {
+      tableName: 'clave-activity',
+      partitionKey: { name: 'user_id',    type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     const collaboratorsTable = new dynamodb.Table(this, 'CollaboratorsTable', {
       tableName: 'clave-collaborators',
       partitionKey: { name: 'project_id',      type: dynamodb.AttributeType.STRING },
@@ -295,6 +317,8 @@ export class ClaveStack extends cdk.Stack {
         DYNAMODB_PROJECTS_TABLE: projectsTable.tableName,
         DYNAMODB_SNAPSHOTS_TABLE: snapshotsTable.tableName,
         DYNAMODB_USERS_TABLE:          usersTable.tableName,
+        DYNAMODB_FOLLOWS_TABLE:        followsTable.tableName,
+        DYNAMODB_ACTIVITY_TABLE:       activityTable.tableName,
         DYNAMODB_COLLABORATORS_TABLE:  collaboratorsTable.tableName,
         DYNAMODB_CONVERSATIONS_TABLE:  conversationsTable.tableName,
         DYNAMODB_MESSAGES_TABLE:       messagesTable.tableName,
@@ -427,6 +451,8 @@ export class ClaveStack extends cdk.Stack {
     bucket.grantReadWrite(webTaskDef.taskRole);
     avatarsBucket.grantPut(webTaskDef.taskRole);
     usersTable.grantReadWriteData(webTaskDef.taskRole);
+    followsTable.grantReadWriteData(webTaskDef.taskRole);
+    activityTable.grantReadWriteData(webTaskDef.taskRole);
     collaboratorsTable.grantReadWriteData(webTaskDef.taskRole);
     conversationsTable.grantReadWriteData(webTaskDef.taskRole);
     messagesTable.grantReadWriteData(webTaskDef.taskRole);

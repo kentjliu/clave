@@ -1,10 +1,11 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getProfileByUsername, getProjects, getSnapshots } from '@/lib/dynamo';
+import { getProfileByUsername, getProjects, getSnapshots, isFollowing, getFollowerCount } from '@/lib/dynamo';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Header } from '@/components/Header';
+import { FollowButton } from '@/components/FollowButton';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,13 @@ export default async function UserProfilePage({
 
   const isOwnProfile = session?.user?.id === profile.user_id;
 
-  const allProjects = await getProjects(profile.user_id);
+  const [allProjects, followerCount, viewerIsFollowing] = await Promise.all([
+    getProjects(profile.user_id),
+    getFollowerCount(profile.user_id),
+    session?.user?.id && !isOwnProfile
+      ? isFollowing(session.user.id, profile.user_id)
+      : Promise.resolve(false),
+  ]);
   const projects = isOwnProfile
     ? allProjects
     : allProjects.filter((p) => (p.visibility ?? 'public') === 'public');
@@ -93,13 +100,20 @@ export default async function UserProfilePage({
             </div>
             <p className={styles.username}>@{profile.username}</p>
             {profile.bio && <p className={styles.bio}>{profile.bio}</p>}
-            <p className={styles.joined}>Joined {formatDate(profile.created_at)}</p>
+            <p className={styles.joined}>
+              Joined {formatDate(profile.created_at)}
+              {' · '}
+              <span>{followerCount} {followerCount === 1 ? 'follower' : 'followers'}</span>
+            </p>
           </div>
 
           {!isOwnProfile && session?.user && (
-            <a href={`/messages/${profile.username}`} className={styles.messageBtn}>
-              Message
-            </a>
+            <div className={styles.profileActions}>
+              <FollowButton username={profile.username} initialFollowing={viewerIsFollowing as boolean} />
+              <a href={`/messages/${profile.username}`} className={styles.messageBtn}>
+                Message
+              </a>
+            </div>
           )}
         </div>
 
