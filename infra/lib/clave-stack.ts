@@ -33,6 +33,25 @@ export class ClaveStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    // Public bucket for user avatars — objects are world-readable, no ACLs.
+    const avatarsBucket = new s3.Bucket(this, 'AvatarsBucket', {
+      bucketName: `clave-avatars-${this.account}-${this.region}`,
+      blockPublicAccess: new s3.BlockPublicAccess({
+        blockPublicAcls: true,
+        ignorePublicAcls: true,
+        blockPublicPolicy: false,
+        restrictPublicBuckets: false,
+      }),
+      publicReadAccess: true,
+      cors: [{
+        allowedMethods: [s3.HttpMethods.PUT],
+        allowedOrigins: ['*'],
+        allowedHeaders: ['*'],
+        maxAge: 3000,
+      }],
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     // ── DynamoDB ──────────────────────────────────────────────────────────────
     const projectsTable = new dynamodb.Table(this, 'ProjectsTable', {
       tableName: 'clave-projects',
@@ -247,6 +266,7 @@ export class ClaveStack extends cdk.Stack {
         DYNAMODB_SNAPSHOTS_TABLE: snapshotsTable.tableName,
         DYNAMODB_USERS_TABLE: usersTable.tableName,
         S3_BUCKET: bucket.bucketName,
+        S3_AVATARS_BUCKET: avatarsBucket.bucketName,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_ISSUER:
           `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
@@ -372,6 +392,7 @@ export class ClaveStack extends cdk.Stack {
     projectsTable.grantReadWriteData(webTaskDef.taskRole);
     snapshotsTable.grantReadWriteData(webTaskDef.taskRole);
     bucket.grantReadWrite(webTaskDef.taskRole);
+    avatarsBucket.grantPut(webTaskDef.taskRole);
     usersTable.grantReadWriteData(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
     cognitoClientSecret.grantRead(webTaskDef.taskRole);
@@ -382,6 +403,7 @@ export class ClaveStack extends cdk.Stack {
 
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
+    new cdk.CfnOutput(this, 'AvatarsBucketName', { value: avatarsBucket.bucketName });
     new cdk.CfnOutput(this, 'ProjectsTableName', { value: projectsTable.tableName });
     new cdk.CfnOutput(this, 'UsersTableName', { value: usersTable.tableName });
     new cdk.CfnOutput(this, 'SnapshotsTableName', { value: snapshotsTable.tableName });

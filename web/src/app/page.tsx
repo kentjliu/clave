@@ -1,9 +1,10 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getProjects } from '@/lib/dynamo';
+import { getProjects, getProfile } from '@/lib/dynamo';
 import { Header } from '@/components/Header';
 import { ProjectsPage } from '@/components/ProjectsPage';
 import { LandingPage } from '@/components/LandingPage';
+import { ProfileBanner } from '@/components/ProfileBanner';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -15,12 +16,16 @@ export default async function HomePage() {
     return <LandingPage />;
   }
 
-  const projects = await getProjects(session.user.id);
+  const [projects, profile] = await Promise.all([
+    getProjects(session.user.id),
+    getProfile(session.user.id),
+  ]);
 
   return (
     <div className={styles.layout}>
       <Header user={session.user} />
       <main className={styles.main}>
+        {!profile && <ProfileBanner />}
         <ProjectsPage projects={projects} />
       </main>
     </div>

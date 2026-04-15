@@ -21,10 +21,11 @@ export async function PUT(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { username, display_name, bio } = await req.json() as {
+  const { username, display_name, bio, avatar_url } = await req.json() as {
     username: string;
     display_name: string;
     bio?: string;
+    avatar_url?: string;
   };
 
   // Validate username.
@@ -47,12 +48,14 @@ export async function PUT(req: Request) {
       username,
       display_name: display_name.trim(),
       bio: bio?.trim(),
+      avatar_url,
     });
   } else {
     await updateProfile(session.user.id, {
       username,
       display_name: display_name.trim(),
       bio: bio?.trim(),
+      avatar_url,
     });
   }
 
