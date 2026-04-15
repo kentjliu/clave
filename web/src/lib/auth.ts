@@ -15,6 +15,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, profile }) {
       if (account) {
         token.sub = (profile as { sub?: string })?.sub ?? account.providerAccountId;
+        token.accessToken = account.access_token;
       }
       return token;
     },
@@ -22,6 +23,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.sub as string;
       }
+      session.accessToken = token.accessToken as string | undefined;
       return session;
     },
   },

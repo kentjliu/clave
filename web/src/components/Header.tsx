@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 import styles from './Header.module.css';
 
@@ -10,9 +11,11 @@ interface Props {
 export function Header({ user }: Props) {
   return (
     <header className={styles.header}>
-      <span className={styles.logo}>Clave</span>
+      <Link href="/" className={styles.logo}>Clave</Link>
       <div className={styles.right}>
-        <span className={styles.email}>{user.email ?? user.name}</span>
+        <Link href="/account" className={styles.email}>
+          {user.email ?? user.name}
+        </Link>
         <button className={styles.signOut} onClick={() => signOut()}>
           Sign out
         </button>

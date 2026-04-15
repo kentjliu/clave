@@ -360,6 +360,10 @@ export class ClaveStack extends cdk.Stack {
     bucket.grantReadWrite(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
     cognitoClientSecret.grantRead(webTaskDef.taskRole);
+    webTaskDef.taskRole.addToPrincipalPolicy(new iam.PolicyStatement({
+      actions: ['cognito-idp:AdminDeleteUser'],
+      resources: [userPool.userPoolArn],
+    }));
 
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
