@@ -8,9 +8,10 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
-// Claude 3.5 Haiku on Bedrock — fast and cheap, same model family.
-// Requires model access to be enabled in the Bedrock console for this region.
-const BEDROCK_MODEL_ID = 'anthropic.claude-3-5-haiku-20241022-v1:0';
+// Cross-region inference profile for Claude Sonnet 4.
+// The "us." prefix routes through the US cross-region inference profile,
+// which is required for newer Claude models on Bedrock.
+const BEDROCK_MODEL_ID = 'us.anthropic.claude-sonnet-4-20250514-v1:0';
 
 export class ClaveStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -74,11 +75,13 @@ export class ClaveStack extends cdk.Stack {
     snapshotsTable.grantReadWriteData(summarizerFn);
     bucket.grantRead(summarizerFn);
 
-    // Allow Lambda to call the specific Bedrock model.
+    // Allow Lambda to invoke the model via cross-region inference profile.
+    // Inference profiles use a different ARN format from foundation models.
     summarizerFn.addToRolePolicy(new iam.PolicyStatement({
       actions: ['bedrock:InvokeModel'],
       resources: [
-        `arn:aws:bedrock:${this.region}::foundation-model/${BEDROCK_MODEL_ID}`,
+        `arn:aws:bedrock:*::foundation-model/*`,
+        `arn:aws:bedrock:*:*:inference-profile/*`,
       ],
     }));
 
