@@ -166,14 +166,12 @@ export function Sequencer() {
     snare.volume.value = -4;
 
     const chh = new Tone.MetalSynth({
-      frequency: 400,
       envelope: { attack: 0.001, decay: 0.04, release: 0.01 },
       harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
     }).toDestination();
     chh.volume.value = -12;
 
     const ohh = new Tone.MetalSynth({
-      frequency: 400,
       envelope: { attack: 0.001, decay: 0.28, release: 0.1 },
       harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5,
     }).toDestination();
