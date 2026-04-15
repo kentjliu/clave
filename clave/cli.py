@@ -151,8 +151,9 @@ def logout():
 @click.option("--region", default=None, help="AWS region.")
 @click.option("--projects-table", default=None, help="DynamoDB projects table name.")
 @click.option("--snapshots-table", default=None, help="DynamoDB snapshots table name.")
+@click.option("--cognito-client-id", default=None, help="Cognito client ID (CognitoClientId CDK output).")
 @click.option("--cognito-client-secret", default=None, help="Cognito client secret (from AWS Secrets Manager: clave/cognito-client-secret).")
-def configure(bucket, region, projects_table, snapshots_table, cognito_client_secret):
+def configure(bucket, region, projects_table, snapshots_table, cognito_client_id, cognito_client_secret):
     """Show or update AWS resource configuration."""
     updates: dict = {}
     if bucket:
@@ -163,6 +164,8 @@ def configure(bucket, region, projects_table, snapshots_table, cognito_client_se
         updates["projects_table"] = projects_table
     if snapshots_table:
         updates["snapshots_table"] = snapshots_table
+    if cognito_client_id:
+        updates["cognito_client_id"] = cognito_client_id
     if cognito_client_secret:
         updates["cognito_client_secret"] = cognito_client_secret
 
@@ -172,11 +175,12 @@ def configure(bucket, region, projects_table, snapshots_table, cognito_client_se
         has_secret = "yes" if cfg.get("cognito_client_secret") else "(not set)"
         click.echo(f"email               : {email}")
         click.echo(f"user_id             : {cfg.get('user_id') or '(not set — run clave login)'}")
+        click.echo(f"cognito_client_id   : {cfg.get('cognito_client_id') or '(not set)'}")
+        click.echo(f"cognito_client_secret: {has_secret}")
         click.echo(f"bucket              : {cfg.get('bucket') or '(not set)'}")
         click.echo(f"region              : {cfg.get('region')}")
         click.echo(f"projects_table      : {cfg.get('projects_table')}")
         click.echo(f"snapshots_table     : {cfg.get('snapshots_table')}")
-        click.echo(f"cognito_client_secret: {has_secret}")
         return
 
     config.save(updates)

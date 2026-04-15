@@ -16,13 +16,23 @@ from botocore.exceptions import ClientError
 from . import config
 
 COGNITO_REGION = "us-east-1"
-COGNITO_CLIENT_ID = "2h9ni2p29gt53r4kkvt816j2hr"
 _REFRESH_BUFFER_MINUTES = 5
+
+
+def _client_id() -> str:
+    cid = config.load().get("cognito_client_id")
+    if not cid:
+        raise ValueError(
+            "Cognito client ID not configured.\n"
+            "Run: clave configure --cognito-client-id <value>\n"
+            "Find it in the CognitoClientId CDK output."
+        )
+    return cid
 
 
 def _secret_hash(username: str, client_secret: str) -> str:
     """Compute the SECRET_HASH required when the Cognito client has a secret."""
-    msg = (username + COGNITO_CLIENT_ID).encode()
+    msg = (username + _client_id()).encode()
     sig = hmac.new(client_secret.encode(), msg, digestmod=hashlib.sha256).digest()
     return base64.b64encode(sig).decode()
 
@@ -48,7 +58,7 @@ def login(email: str, password: str) -> dict:
         resp = _idp().initiate_auth(
             AuthFlow="USER_PASSWORD_AUTH",
             AuthParameters=auth_params,
-            ClientId=COGNITO_CLIENT_ID,
+            ClientId=_client_id(),
         )
     except ClientError as e:
         code = e.response["Error"]["Code"]
@@ -93,7 +103,7 @@ def logout():
                 extra["ClientSecret"] = client_secret
             _idp().revoke_token(
                 Token=refresh_token,
-                ClientId=COGNITO_CLIENT_ID,
+                ClientId=_client_id(),
                 **extra,
             )
         except ClientError:
@@ -154,7 +164,7 @@ def _refresh(refresh_token: str, client_secret: str) -> str:
     resp = _idp().initiate_auth(
         AuthFlow="REFRESH_TOKEN_AUTH",
         AuthParameters=auth_params,
-        ClientId=COGNITO_CLIENT_ID,
+        ClientId=_client_id(),
     )
     result = resp["AuthenticationResult"]
     expiry = (
