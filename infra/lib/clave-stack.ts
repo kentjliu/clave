@@ -76,6 +76,22 @@ export class ClaveStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const conversationsTable = new dynamodb.Table(this, 'ConversationsTable', {
+      tableName: 'clave-conversations',
+      partitionKey: { name: 'participant_id', type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'conversation_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const messagesTable = new dynamodb.Table(this, 'MessagesTable', {
+      tableName: 'clave-messages',
+      partitionKey: { name: 'conversation_id', type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'created_at', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
     usersTable.addGlobalSecondaryIndex({
       indexName: 'username-index',
       partitionKey: { name: 'username', type: dynamodb.AttributeType.STRING },
@@ -264,7 +280,9 @@ export class ClaveStack extends cdk.Stack {
         NODE_ENV: 'production',
         DYNAMODB_PROJECTS_TABLE: projectsTable.tableName,
         DYNAMODB_SNAPSHOTS_TABLE: snapshotsTable.tableName,
-        DYNAMODB_USERS_TABLE: usersTable.tableName,
+        DYNAMODB_USERS_TABLE:          usersTable.tableName,
+        DYNAMODB_CONVERSATIONS_TABLE:  conversationsTable.tableName,
+        DYNAMODB_MESSAGES_TABLE:       messagesTable.tableName,
         S3_BUCKET: bucket.bucketName,
         S3_AVATARS_BUCKET: avatarsBucket.bucketName,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
@@ -394,6 +412,8 @@ export class ClaveStack extends cdk.Stack {
     bucket.grantReadWrite(webTaskDef.taskRole);
     avatarsBucket.grantPut(webTaskDef.taskRole);
     usersTable.grantReadWriteData(webTaskDef.taskRole);
+    conversationsTable.grantReadWriteData(webTaskDef.taskRole);
+    messagesTable.grantReadWriteData(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
     cognitoClientSecret.grantRead(webTaskDef.taskRole);
     webTaskDef.taskRole.addToPrincipalPolicy(new iam.PolicyStatement({

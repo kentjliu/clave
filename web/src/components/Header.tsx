@@ -15,6 +15,7 @@ export function Header({ user, username }: Props) {
       <Link href="/" className={styles.logo}>Clave</Link>
       <nav className={styles.nav}>
         <Link href="/explore" className={styles.navLink}>Explore</Link>
+        {user && <Link href="/messages" className={styles.navLink}>Messages</Link>}
       </nav>
       <div className={styles.right}>
         {username && (

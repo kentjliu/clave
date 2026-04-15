@@ -1,12 +1,14 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand, GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand, GetCommand, ScanCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION_NAME });
 export const dynamo = DynamoDBDocumentClient.from(client);
 
-export const PROJECTS_TABLE  = process.env.DYNAMODB_PROJECTS_TABLE!;
-export const SNAPSHOTS_TABLE = process.env.DYNAMODB_SNAPSHOTS_TABLE!;
-export const USERS_TABLE     = process.env.DYNAMODB_USERS_TABLE!;
+export const PROJECTS_TABLE       = process.env.DYNAMODB_PROJECTS_TABLE!;
+export const SNAPSHOTS_TABLE      = process.env.DYNAMODB_SNAPSHOTS_TABLE!;
+export const USERS_TABLE          = process.env.DYNAMODB_USERS_TABLE!;
+export const CONVERSATIONS_TABLE  = process.env.DYNAMODB_CONVERSATIONS_TABLE!;
+export const MESSAGES_TABLE       = process.env.DYNAMODB_MESSAGES_TABLE!;
 
 // ── Username validation ───────────────────────────────────────────────────────
 
@@ -242,4 +244,116 @@ export async function getSnapshots(projectId: string): Promise<SnapshotRecord[]>
   } while (lastKey);
 
   return items;
+}
+
+// ── Messaging ─────────────────────────────────────────────────────────────────
+
+export interface ConversationRecord {
+  participant_id:       string;   // PK — the user who "owns" this record
+  conversation_id:      string;   // SK — canonical sorted user IDs joined by #
+  other_user_id:        string;
+  other_username:       string;
+  other_display_name:   string;
+  other_avatar_url?:    string;
+  last_message_preview: string;
+  last_at:              string;
+  unread:               number;
+}
+
+export interface MessageRecord {
+  conversation_id: string;
+  created_at:      string;
+  sender_id:       string;
+  content:         string;
+}
+
+export function makeConversationId(a: string, b: string): string {
+  return [a, b].sort().join('#');
+}
+
+export async function getConversations(userId: string): Promise<ConversationRecord[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: CONVERSATIONS_TABLE,
+    KeyConditionExpression: 'participant_id = :uid',
+    ExpressionAttributeValues: { ':uid': userId },
+    ScanIndexForward: false,
+  }));
+  return (res.Items ?? []) as ConversationRecord[];
+}
+
+export async function getMessages(conversationId: string): Promise<MessageRecord[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: MESSAGES_TABLE,
+    KeyConditionExpression: 'conversation_id = :cid',
+    ExpressionAttributeValues: { ':cid': conversationId },
+    ScanIndexForward: true,
+  }));
+  return (res.Items ?? []) as MessageRecord[];
+}
+
+export async function sendMessage(params: {
+  senderId:           string;
+  senderProfile:      Pick<UserProfile, 'username' | 'display_name' | 'avatar_url'>;
+  recipientId:        string;
+  recipientProfile:   Pick<UserProfile, 'username' | 'display_name' | 'avatar_url'>;
+  content:            string;
+}): Promise<MessageRecord> {
+  const { senderId, senderProfile, recipientId, recipientProfile, content } = params;
+  const conversationId = makeConversationId(senderId, recipientId);
+  const createdAt = new Date().toISOString();
+  const preview = content.length > 60 ? content.slice(0, 60) + '…' : content;
+
+  // Write the message.
+  await dynamo.send(new PutCommand({
+    TableName: MESSAGES_TABLE,
+    Item: { conversation_id: conversationId, created_at: createdAt, sender_id: senderId, content },
+  }));
+
+  // Upsert conversation record for sender (unread stays 0 — they just sent it).
+  await dynamo.send(new UpdateCommand({
+    TableName: CONVERSATIONS_TABLE,
+    Key: { participant_id: senderId, conversation_id: conversationId },
+    UpdateExpression:
+      'SET other_user_id = :oid, other_username = :ou, other_display_name = :odn, ' +
+      'other_avatar_url = :oav, last_message_preview = :lmp, last_at = :la, unread = :zero',
+    ExpressionAttributeValues: {
+      ':oid':  recipientId,
+      ':ou':   recipientProfile.username,
+      ':odn':  recipientProfile.display_name,
+      ':oav':  recipientProfile.avatar_url ?? null,
+      ':lmp':  preview,
+      ':la':   createdAt,
+      ':zero': 0,
+    },
+  }));
+
+  // Upsert conversation record for recipient — increment unread.
+  await dynamo.send(new UpdateCommand({
+    TableName: CONVERSATIONS_TABLE,
+    Key: { participant_id: recipientId, conversation_id: conversationId },
+    UpdateExpression:
+      'SET other_user_id = :oid, other_username = :ou, other_display_name = :odn, ' +
+      'other_avatar_url = :oav, last_message_preview = :lmp, last_at = :la ' +
+      'ADD unread :one',
+    ExpressionAttributeValues: {
+      ':oid':  senderId,
+      ':ou':   senderProfile.username,
+      ':odn':  senderProfile.display_name,
+      ':oav':  senderProfile.avatar_url ?? null,
+      ':lmp':  preview,
+      ':la':   createdAt,
+      ':one':  1,
+    },
+  }));
+
+  return { conversation_id: conversationId, created_at: createdAt, sender_id: senderId, content };
+}
+
+export async function markConversationRead(userId: string, conversationId: string): Promise<void> {
+  await dynamo.send(new UpdateCommand({
+    TableName: CONVERSATIONS_TABLE,
+    Key: { participant_id: userId, conversation_id: conversationId },
+    UpdateExpression: 'SET unread = :zero',
+    ExpressionAttributeValues: { ':zero': 0 },
+  }));
 }

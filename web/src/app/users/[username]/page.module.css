@@ -107,9 +107,12 @@
   font-size: 13px;
   font-weight: 500;
   padding: 9px 18px;
-  cursor: not-allowed;
-  opacity: 0.5;
+  text-decoration: none;
+  display: inline-block;
+  transition: background 0.15s;
 }
+
+.messageBtn:hover { background: var(--accent-hover); }
 
 /* ── Projects ── */
 .projectsSection {

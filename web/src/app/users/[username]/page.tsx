@@ -94,9 +94,9 @@ export default async function UserProfilePage({
           </div>
 
           {!isOwnProfile && session?.user && (
-            <button className={styles.messageBtn} disabled title="Coming soon">
+            <a href={`/messages/${profile.username}`} className={styles.messageBtn}>
               Message
-            </button>
+            </a>
           )}
         </div>
 
