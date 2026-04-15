@@ -10,6 +10,7 @@ interface Props {
   snapshots: SnapshotRecord[];
   projectId: string;
   userId: string;
+  readonly?: boolean;
 }
 
 function formatBytes(bytes: number): string {
@@ -32,10 +33,12 @@ function SnapshotRow({
   snap,
   projectId,
   onSummaryUpdate,
+  readonly = false,
 }: {
   snap: SnapshotRecord;
   projectId: string;
   onSummaryUpdate: (timestamp: string, summary: string) => void;
+  readonly?: boolean;
 }) {
   const [downloading, setDownloading] = useState(false);
   const [expanded, setExpanded]       = useState(false);
@@ -91,7 +94,7 @@ function SnapshotRow({
     try { return JSON.parse(snap.metadata); } catch { return null; }
   })() : null;
 
-  const canEdit = snap.summary_status === 'done' || snap.summary_status === 'failed';
+  const canEdit = !readonly && (snap.summary_status === 'done' || snap.summary_status === 'failed');
 
   return (
     <li className={styles.row}>
@@ -193,7 +196,7 @@ function hasPending(snaps: SnapshotRecord[]): boolean {
   return snaps.some((s) => s.summary_status !== 'done' && s.summary_status !== 'failed');
 }
 
-export function SnapshotList({ snapshots: initial, projectId }: Props) {
+export function SnapshotList({ snapshots: initial, projectId, readonly = false }: Props) {
   const [snapshots, setSnapshots] = useState(initial);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -249,6 +252,7 @@ export function SnapshotList({ snapshots: initial, projectId }: Props) {
           snap={snap}
           projectId={projectId}
           onSummaryUpdate={handleSummaryUpdate}
+          readonly={readonly}
         />
       ))}
     </ul>

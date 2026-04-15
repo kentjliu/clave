@@ -76,6 +76,20 @@ export class ClaveStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const collaboratorsTable = new dynamodb.Table(this, 'CollaboratorsTable', {
+      tableName: 'clave-collaborators',
+      partitionKey: { name: 'project_id',      type: dynamodb.AttributeType.STRING },
+      sortKey:      { name: 'collaborator_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    collaboratorsTable.addGlobalSecondaryIndex({
+      indexName: 'collaborator-index',
+      partitionKey: { name: 'collaborator_id', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     const conversationsTable = new dynamodb.Table(this, 'ConversationsTable', {
       tableName: 'clave-conversations',
       partitionKey: { name: 'participant_id', type: dynamodb.AttributeType.STRING },
@@ -281,6 +295,7 @@ export class ClaveStack extends cdk.Stack {
         DYNAMODB_PROJECTS_TABLE: projectsTable.tableName,
         DYNAMODB_SNAPSHOTS_TABLE: snapshotsTable.tableName,
         DYNAMODB_USERS_TABLE:          usersTable.tableName,
+        DYNAMODB_COLLABORATORS_TABLE:  collaboratorsTable.tableName,
         DYNAMODB_CONVERSATIONS_TABLE:  conversationsTable.tableName,
         DYNAMODB_MESSAGES_TABLE:       messagesTable.tableName,
         S3_BUCKET: bucket.bucketName,
@@ -412,6 +427,7 @@ export class ClaveStack extends cdk.Stack {
     bucket.grantReadWrite(webTaskDef.taskRole);
     avatarsBucket.grantPut(webTaskDef.taskRole);
     usersTable.grantReadWriteData(webTaskDef.taskRole);
+    collaboratorsTable.grantReadWriteData(webTaskDef.taskRole);
     conversationsTable.grantReadWriteData(webTaskDef.taskRole);
     messagesTable.grantReadWriteData(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);

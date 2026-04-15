@@ -7,6 +7,7 @@ export const dynamo = DynamoDBDocumentClient.from(client);
 export const PROJECTS_TABLE       = process.env.DYNAMODB_PROJECTS_TABLE!;
 export const SNAPSHOTS_TABLE      = process.env.DYNAMODB_SNAPSHOTS_TABLE!;
 export const USERS_TABLE          = process.env.DYNAMODB_USERS_TABLE!;
+export const COLLABORATORS_TABLE  = process.env.DYNAMODB_COLLABORATORS_TABLE!;
 export const CONVERSATIONS_TABLE  = process.env.DYNAMODB_CONVERSATIONS_TABLE!;
 export const MESSAGES_TABLE       = process.env.DYNAMODB_MESSAGES_TABLE!;
 
@@ -382,5 +383,98 @@ export async function markConversationRead(userId: string, conversationId: strin
     Key: { participant_id: userId, conversation_id: conversationId },
     UpdateExpression: 'SET unread = :zero',
     ExpressionAttributeValues: { ':zero': 0 },
+  }));
+}
+
+// ── Collaborators ─────────────────────────────────────────────────────────────
+
+export interface CollaboratorRecord {
+  project_id:       string;
+  collaborator_id:  string;
+  project_owner_id: string;
+  project_name:     string;
+  // Denormalized collaborator profile (snapshot at invite time)
+  display_name:     string;
+  username:         string;
+  avatar_url?:      string;
+  invited_at:       string;
+  status:           'pending' | 'accepted';
+}
+
+export async function getCollaborators(projectId: string): Promise<CollaboratorRecord[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: COLLABORATORS_TABLE,
+    KeyConditionExpression: 'project_id = :pid',
+    ExpressionAttributeValues: { ':pid': projectId },
+  }));
+  return (res.Items ?? []) as CollaboratorRecord[];
+}
+
+export async function getCollaboratorRecord(
+  projectId: string,
+  collaboratorId: string,
+): Promise<CollaboratorRecord | null> {
+  const res = await dynamo.send(new GetCommand({
+    TableName: COLLABORATORS_TABLE,
+    Key: { project_id: projectId, collaborator_id: collaboratorId },
+  }));
+  return (res.Item as CollaboratorRecord) ?? null;
+}
+
+// All projects (pending + accepted) where this user is a collaborator.
+export async function getCollaborations(userId: string): Promise<CollaboratorRecord[]> {
+  const res = await dynamo.send(new QueryCommand({
+    TableName: COLLABORATORS_TABLE,
+    IndexName: 'collaborator-index',
+    KeyConditionExpression: 'collaborator_id = :uid',
+    ExpressionAttributeValues: { ':uid': userId },
+  }));
+  return (res.Items ?? []) as CollaboratorRecord[];
+}
+
+export async function inviteCollaborator(params: {
+  projectId:       string;
+  projectOwnerId:  string;
+  projectName:     string;
+  collaboratorId:  string;
+  displayName:     string;
+  username:        string;
+  avatarUrl?:      string;
+}): Promise<void> {
+  await dynamo.send(new PutCommand({
+    TableName: COLLABORATORS_TABLE,
+    Item: {
+      project_id:       params.projectId,
+      collaborator_id:  params.collaboratorId,
+      project_owner_id: params.projectOwnerId,
+      project_name:     params.projectName,
+      display_name:     params.displayName,
+      username:         params.username,
+      avatar_url:       params.avatarUrl ?? null,
+      invited_at:       new Date().toISOString(),
+      status:           'pending',
+    },
+    ConditionExpression: 'attribute_not_exists(collaborator_id)',
+  }));
+}
+
+export async function updateCollaboratorStatus(
+  projectId: string,
+  collaboratorId: string,
+  status: 'accepted',
+): Promise<void> {
+  await dynamo.send(new UpdateCommand({
+    TableName: COLLABORATORS_TABLE,
+    Key: { project_id: projectId, collaborator_id: collaboratorId },
+    UpdateExpression: 'SET #s = :s',
+    ExpressionAttributeNames: { '#s': 'status' },
+    ExpressionAttributeValues: { ':s': status },
+  }));
+}
+
+export async function removeCollaborator(projectId: string, collaboratorId: string): Promise<void> {
+  await dynamo.send(new DeleteCommand({
+    TableName: COLLABORATORS_TABLE,
+    Key: { project_id: projectId, collaborator_id: collaboratorId },
   }));
 }
