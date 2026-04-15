@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { SnapshotRecord } from '@/lib/dynamo';
 import styles from './SnapshotList.module.css';
+
+const POLL_INTERVAL_MS = 4000;
 
 interface Props {
   snapshots: SnapshotRecord[];
@@ -110,7 +112,41 @@ function SnapshotRow({ snap, projectId }: { snap: SnapshotRecord; projectId: str
   );
 }
 
-export function SnapshotList({ snapshots, projectId }: Props) {
+function hasPending(snaps: SnapshotRecord[]): boolean {
+  return snaps.some((s) => s.summary_status !== 'done' && s.summary_status !== 'failed');
+}
+
+export function SnapshotList({ snapshots: initial, projectId }: Props) {
+  const [snapshots, setSnapshots] = useState(initial);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setSnapshots(initial);
+  }, [initial]);
+
+  useEffect(() => {
+    if (!hasPending(snapshots)) return;
+
+    async function poll() {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/snapshots`);
+        if (res.ok) {
+          const fresh: SnapshotRecord[] = await res.json();
+          setSnapshots(fresh);
+          if (hasPending(fresh)) {
+            timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+          }
+        }
+      } catch {
+        // silently retry
+        timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+      }
+    }
+
+    timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [snapshots, projectId]);
+
   if (snapshots.length === 0) {
     return (
       <div className={styles.empty}>
