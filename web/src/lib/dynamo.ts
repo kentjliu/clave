@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({ region: process.env.AWS_REGION_NAME });
 export const dynamo = DynamoDBDocumentClient.from(client);
@@ -12,6 +12,7 @@ export interface ProjectRecord {
   project_id: string;
   name: string;
   flp_path: string;
+  watch_path?: string;   // absolute local path the agent should watch; absent = not watched
 }
 
 export interface SnapshotRecord {
@@ -67,6 +68,32 @@ export async function createSnapshot(snapshot: {
     ConditionExpression: 'attribute_not_exists(#ts)',
     ExpressionAttributeNames: { '#ts': 'timestamp' },
   }));
+}
+
+export async function setWatchPath(
+  userId: string,
+  projectId: string,
+  watchPath: string | null,
+): Promise<void> {
+  if (watchPath) {
+    await dynamo.send(new UpdateCommand({
+      TableName: PROJECTS_TABLE,
+      Key: { user_id: userId, project_id: projectId },
+      UpdateExpression: 'SET watch_path = :wp',
+      ExpressionAttributeValues: { ':wp': watchPath },
+    }));
+  } else {
+    await dynamo.send(new UpdateCommand({
+      TableName: PROJECTS_TABLE,
+      Key: { user_id: userId, project_id: projectId },
+      UpdateExpression: 'REMOVE watch_path',
+    }));
+  }
+}
+
+export async function getWatchedProjects(userId: string): Promise<ProjectRecord[]> {
+  const all = await getProjects(userId);
+  return all.filter((p) => p.watch_path);
 }
 
 export async function getProjects(userId: string): Promise<ProjectRecord[]> {
