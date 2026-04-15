@@ -1,13 +1,10 @@
 """
 Local config stored at ~/.clave/config.json.
 
-Populated manually after `cdk deploy` using the stack outputs, or via
-`clave configure`. The user_id is generated once on first run and persisted
-here — it becomes the DynamoDB partition key for all projects, making the
-data model multi-tenant from day one.
+user_id is the Cognito sub, set automatically on `clave login`.
+AWS resource names are pre-populated with single-tenant defaults.
 """
 import json
-import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -24,20 +21,14 @@ _DEFAULTS: dict = {
 
 
 def load() -> dict:
-    """Load config, generating a user_id on first run."""
+    """Load config from disk, merging with defaults."""
     if CONFIG_PATH.exists():
         with open(CONFIG_PATH) as f:
             saved = json.load(f)
     else:
         saved = {}
 
-    cfg = {**_DEFAULTS, **saved}
-
-    if not cfg["user_id"]:
-        cfg["user_id"] = str(uuid.uuid4())
-        _write(cfg)
-
-    return cfg
+    return {**_DEFAULTS, **saved}
 
 
 def save(updates: dict):

@@ -281,7 +281,7 @@ export class ClaveStack extends cdk.Stack {
     const userPoolClient = userPool.addClient('WebClient', {
       userPoolClientName: 'clave-web',
       generateSecret: false,
-      authFlows: { userSrp: true },
+      authFlows: { userSrp: true, userPassword: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [

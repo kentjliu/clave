@@ -7,7 +7,7 @@ from typing import Optional
 
 import click
 
-from . import config, parser, registry, retention, snapshot, storage
+from . import auth, config, parser, registry, retention, snapshot, storage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -41,13 +41,20 @@ def _is_locked(flp_path: Path) -> bool:
     return _lockfile(flp_path).exists()
 
 
-# ── Config guard ──────────────────────────────────────────────────────────────
+# ── Auth guard ────────────────────────────────────────────────────────────────
 
-def _require_bucket(cfg: dict):
+def _require_login(cfg: dict):
+    if not cfg.get("user_id") or not cfg.get("access_token"):
+        click.echo(
+            "Error: not logged in.\nRun `clave login` to authenticate.",
+            err=True,
+        )
+        sys.exit(1)
+
     if not cfg.get("bucket"):
         click.echo(
             "Error: no S3 bucket configured.\n"
-            "Run `clave configure --bucket <name>` after deploying the CDK stack.",
+            "Run `clave configure --bucket <name>` with the value from `cdk deploy` output.",
             err=True,
         )
         sys.exit(1)
@@ -114,12 +121,38 @@ def main():
 
 
 @main.command()
+@click.option("--email", prompt=True, help="Your Clave account email.")
+@click.option(
+    "--password", prompt=True, hide_input=True, help="Your Clave account password."
+)
+def login(email: str, password: str):
+    """Log in to your Clave account."""
+    try:
+        cfg = auth.login(email, password)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Logged in as {email}  (user_id: {cfg['user_id']})")
+
+
+@main.command()
+def logout():
+    """Log out and clear stored credentials."""
+    if not auth.is_logged_in():
+        click.echo("Not logged in.")
+        return
+    auth.logout()
+    click.echo("Logged out.")
+
+
+@main.command()
 @click.option("--bucket", default=None, help="S3 bucket name (from cdk deploy output).")
 @click.option("--region", default=None, help="AWS region.")
 @click.option("--projects-table", default=None, help="DynamoDB projects table name.")
 @click.option("--snapshots-table", default=None, help="DynamoDB snapshots table name.")
 def configure(bucket, region, projects_table, snapshots_table):
-    """Set AWS resource names from the CDK stack outputs."""
+    """Show or update AWS resource configuration."""
     updates: dict = {}
     if bucket:
         updates["bucket"] = bucket
@@ -131,13 +164,14 @@ def configure(bucket, region, projects_table, snapshots_table):
         updates["snapshots_table"] = snapshots_table
 
     if not updates:
-        # Print current config
         cfg = config.load()
-        click.echo(f"user_id       : {cfg['user_id']}")
-        click.echo(f"bucket        : {cfg.get('bucket') or '(not set)'}")
-        click.echo(f"region        : {cfg.get('region')}")
-        click.echo(f"projects_table: {cfg.get('projects_table')}")
-        click.echo(f"snapshots_table:{cfg.get('snapshots_table')}")
+        email = cfg.get("email") or "(not logged in)"
+        click.echo(f"email          : {email}")
+        click.echo(f"user_id        : {cfg.get('user_id') or '(not set — run clave login)'}")
+        click.echo(f"bucket         : {cfg.get('bucket') or '(not set)'}")
+        click.echo(f"region         : {cfg.get('region')}")
+        click.echo(f"projects_table : {cfg.get('projects_table')}")
+        click.echo(f"snapshots_table: {cfg.get('snapshots_table')}")
         return
 
     config.save(updates)
@@ -156,7 +190,7 @@ def watch(flp_path: Path):
         sys.exit(1)
 
     cfg = config.load()
-    _require_bucket(cfg)
+    _require_login(cfg)
 
     if _is_locked(flp_path):
         click.echo(
@@ -166,7 +200,6 @@ def watch(flp_path: Path):
         )
         sys.exit(1)
 
-    # Resolve or create a stable project_id for this file path.
     flp_str = str(flp_path)
     project_id = config.get_project_id(cfg, flp_str) or str(uuid.uuid4())
     config.register_project(flp_str, project_id)
@@ -184,6 +217,7 @@ def watch(flp_path: Path):
     _acquire_lock(flp_path)
     click.echo(f"Watching : {flp_path}")
     click.echo(f"Project  : {project_id}")
+    click.echo(f"Account  : {cfg.get('email')}")
     click.echo("Press Ctrl+C to stop.")
 
     try:
@@ -198,7 +232,7 @@ def watch(flp_path: Path):
 def log_cmd(flp_path: Optional[Path], limit: int):
     """List recent snapshots. Optionally filter to a specific .flp file."""
     cfg = config.load()
-    _require_bucket(cfg)
+    _require_login(cfg)
 
     if flp_path:
         project_id = config.get_project_id(cfg, str(flp_path.resolve()))
@@ -241,7 +275,7 @@ def restore(flp_path: Path, timestamp: str, yes: bool):
     """
     flp_path = flp_path.resolve()
     cfg = config.load()
-    _require_bucket(cfg)
+    _require_login(cfg)
 
     if _is_locked(flp_path):
         click.echo(
@@ -266,7 +300,6 @@ def restore(flp_path: Path, timestamp: str, yes: bool):
             f"Restore snapshot {timestamp} over {flp_path.name}?", abort=True
         )
 
-    # Download to a temp file first, then atomically replace.
     with tempfile.NamedTemporaryFile(suffix=".flp", delete=False) as tmp:
         tmp_path = Path(tmp.name)
 
@@ -284,7 +317,7 @@ def restore(flp_path: Path, timestamp: str, yes: bool):
 def projects():
     """List all tracked projects."""
     cfg = config.load()
-    _require_bucket(cfg)
+    _require_login(cfg)
     all_projects = registry.list_projects(cfg["user_id"], cfg["projects_table"], cfg["region"])
     if not all_projects:
         click.echo("No projects tracked yet.")
