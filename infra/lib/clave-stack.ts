@@ -50,6 +50,19 @@ export class ClaveStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
+    const usersTable = new dynamodb.Table(this, 'UsersTable', {
+      tableName: 'clave-users',
+      partitionKey: { name: 'user_id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    usersTable.addGlobalSecondaryIndex({
+      indexName: 'username-index',
+      partitionKey: { name: 'username', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     snapshotsTable.addGlobalSecondaryIndex({
       indexName: 'hash-index',
       partitionKey: { name: 'hash', type: dynamodb.AttributeType.STRING },
@@ -232,6 +245,7 @@ export class ClaveStack extends cdk.Stack {
         NODE_ENV: 'production',
         DYNAMODB_PROJECTS_TABLE: projectsTable.tableName,
         DYNAMODB_SNAPSHOTS_TABLE: snapshotsTable.tableName,
+        DYNAMODB_USERS_TABLE: usersTable.tableName,
         S3_BUCKET: bucket.bucketName,
         COGNITO_USER_POOL_ID: userPool.userPoolId,
         COGNITO_ISSUER:
@@ -358,6 +372,7 @@ export class ClaveStack extends cdk.Stack {
     projectsTable.grantReadWriteData(webTaskDef.taskRole);
     snapshotsTable.grantReadWriteData(webTaskDef.taskRole);
     bucket.grantReadWrite(webTaskDef.taskRole);
+    usersTable.grantReadWriteData(webTaskDef.taskRole);
     nextAuthSecret.grantRead(webTaskDef.taskRole);
     cognitoClientSecret.grantRead(webTaskDef.taskRole);
     webTaskDef.taskRole.addToPrincipalPolicy(new iam.PolicyStatement({
@@ -368,6 +383,7 @@ export class ClaveStack extends cdk.Stack {
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'BucketName', { value: bucket.bucketName });
     new cdk.CfnOutput(this, 'ProjectsTableName', { value: projectsTable.tableName });
+    new cdk.CfnOutput(this, 'UsersTableName', { value: usersTable.tableName });
     new cdk.CfnOutput(this, 'SnapshotsTableName', { value: snapshotsTable.tableName });
     new cdk.CfnOutput(this, 'BedrockModelId', { value: BEDROCK_MODEL_ID });
     new cdk.CfnOutput(this, 'EcrRepoUri', { value: ecrRepo.repositoryUri });
