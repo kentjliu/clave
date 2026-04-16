@@ -15,7 +15,7 @@ import requests
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
-from . import auth, config, parser
+from . import auth, config, parser, renderer
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +92,18 @@ def _on_change(flp_path: Path, project_id: str, prev_hash: list[str | None]) -> 
         })
         _upload(result["upload_url"], flp_path)
         log.info(f"[{flp_path.name}] Snapshot uploaded [{current_hash[:12]}]")
+
+        # Kick off audio render in background — never blocks the watcher.
+        timestamp = result.get("timestamp")
+        token = auth.get_access_token()
+        if timestamp and token:
+            t = threading.Thread(
+                target=renderer.render_preview,
+                args=(flp_path, token, project_id, timestamp, API_BASE),
+                daemon=True,
+            )
+            t.start()
+
     except Exception as e:
         log.error(f"[{flp_path.name}] Upload failed: {e}")
 

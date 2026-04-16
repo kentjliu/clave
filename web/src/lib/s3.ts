@@ -16,3 +16,19 @@ export async function getUploadUrl(s3Key: string): Promise<string> {
     { expiresIn: 300 },
   );
 }
+
+export async function getAudioUploadUrl(s3Key: string): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: BUCKET, Key: s3Key, ContentType: 'audio/mpeg' }),
+    { expiresIn: 300 },
+  );
+}
+
+export async function getAudioUrl(s3Key: string): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new GetObjectCommand({ Bucket: BUCKET, Key: s3Key }),
+    { expiresIn: 3600 },
+  );
+}

@@ -164,6 +164,21 @@ function SnapshotRow({
         </div>
       </div>
 
+      {snap.audio_url && (
+        <div className={styles.audioWrap}>
+          <audio
+            className={styles.audioPlayer}
+            controls
+            preload="none"
+            src={snap.audio_url}
+          />
+          <span className={styles.audioLabel}>90s preview</span>
+        </div>
+      )}
+      {snap.audio_status === 'rendering' && !snap.audio_url && (
+        <div className={styles.audioRendering}>Rendering audio preview…</div>
+      )}
+
       {expanded && meta && (
         <div className={styles.meta}>
           {meta.tempo && <span className={styles.tag}>♩ {meta.tempo} BPM</span>}
@@ -193,7 +208,11 @@ function SnapshotRow({
 }
 
 function hasPending(snaps: SnapshotRecord[]): boolean {
-  return snaps.some((s) => s.summary_status !== 'done' && s.summary_status !== 'failed');
+  return snaps.some(
+    (s) =>
+      (s.summary_status !== 'done' && s.summary_status !== 'failed') ||
+      s.audio_status === 'rendering',
+  );
 }
 
 export function SnapshotList({ snapshots: initial, projectId, readonly = false }: Props) {

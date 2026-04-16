@@ -149,6 +149,9 @@ export interface SnapshotRecord {
   metadata: string;
   summary?: string;
   summary_status?: string;
+  audio_status?: 'rendering' | 'done' | 'failed';
+  audio_s3_key?: string;
+  audio_url?: string;   // injected by the snapshots API, never stored
 }
 
 export async function createProject(project: {
@@ -242,6 +245,30 @@ export async function getProjects(userId: string): Promise<ProjectRecord[]> {
     ExpressionAttributeValues: { ':uid': userId },
   }));
   return (res.Items ?? []) as ProjectRecord[];
+}
+
+export async function updateSnapshotAudio(
+  projectId: string,
+  timestamp: string,
+  update:
+    | { status: 'rendering' | 'failed' }
+    | { status: 'done'; s3Key: string },
+): Promise<void> {
+  if (update.status === 'done') {
+    await dynamo.send(new UpdateCommand({
+      TableName: SNAPSHOTS_TABLE,
+      Key: { project_id: projectId, timestamp },
+      UpdateExpression: 'SET audio_status = :st, audio_s3_key = :key',
+      ExpressionAttributeValues: { ':st': 'done', ':key': update.s3Key },
+    }));
+  } else {
+    await dynamo.send(new UpdateCommand({
+      TableName: SNAPSHOTS_TABLE,
+      Key: { project_id: projectId, timestamp },
+      UpdateExpression: 'SET audio_status = :st',
+      ExpressionAttributeValues: { ':st': update.status },
+    }));
+  }
 }
 
 export async function updateSnapshotSummary(
